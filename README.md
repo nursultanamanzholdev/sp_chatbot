@@ -33,6 +33,11 @@ This README provides complete instructions for setting up and launching the proj
    pip install -r requirements.txt
    ```
 
+4. Run database migrations:
+   ```bash
+   python migrations.py
+   ```
+
 ### Frontend Setup
 
 1. Navigate to the frontend directory:
@@ -72,6 +77,10 @@ This README provides complete instructions for setting up and launching the proj
 ## Accessing the Application
 
 After starting both the backend and frontend servers, you can access the application by opening your browser and navigating to the URL displayed in the frontend terminal (typically http://localhost:3000 or http://localhost:5173).
+
+## Stopping the Servers
+
+To stop either server, press `Ctrl+C` in the respective terminal window.
 
 ## Troubleshooting
 
