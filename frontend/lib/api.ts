@@ -49,6 +49,25 @@ export const userApi = {
   },
 }
 
+// PDF Books API
+export const pdfBooksApi = {
+  uploadPDFBook: async (file: File, bookReference: string) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('book_reference', bookReference)
+
+    const response = await fetch(`${API_URL}/pdf-books`, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        // Don't set Content-Type here, let the browser set it with the boundary
+      },
+      body: formData,
+    })
+    return handleResponse(response)
+  },
+}
+
 // Learning prompts API
 export const promptsApi = {
   getPrompts: async () => {

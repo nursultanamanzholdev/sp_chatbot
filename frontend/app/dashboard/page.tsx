@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Pencil, Plus, Trash2, Loader2 } from "lucide-react"
 import { AddUserModal } from "@/components/add-user-modal"
 import { useLocale } from "@/lib/locale-context"
-import { promptsApi } from "@/lib/api"
+import { promptsApi, pdfBooksApi } from "@/lib/api"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import {
@@ -65,15 +65,36 @@ export default function DashboardPage() {
     fetchPrompts()
   }, [toast])
 
-  const handleAddUser = async (name: string, prompt: string) => {
+  const handleAddUser = async (name: string, prompt: string, pdfFile: File | null, bookReference: string) => {
     try {
       setIsLoading(true)
+      
+      // First create the prompt
       const newPrompt = await promptsApi.createPrompt({ name, prompt })
       setPrompts([...prompts, newPrompt])
-      toast({
-        title: "Success",
-        description: "New user prompt added successfully",
-      })
+      
+      // If PDF file and reference are provided, upload the PDF
+      if (pdfFile && bookReference.trim()) {
+        try {
+          await pdfBooksApi.uploadPDFBook(pdfFile, bookReference)
+          toast({
+            title: "Success",
+            description: "User prompt and PDF book added successfully",
+          })
+        } catch (pdfErr: any) {
+          // If PDF upload fails, still show success for prompt but warn about PDF
+          toast({
+            variant: "destructive",
+            title: "Warning",
+            description: `User prompt added but PDF upload failed: ${pdfErr.message || "Unknown error"}`
+          })
+        }
+      } else {
+        toast({
+          title: "Success",
+          description: "New user prompt added successfully",
+        })
+      }
     } catch (err: any) {
       toast({
         variant: "destructive",

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -18,6 +18,7 @@ class User(Base):
 
     prompts = relationship("Prompt", back_populates="user")
     history = relationship("History", back_populates="user")
+    pdf_books = relationship("PDFBook", back_populates="user")
 
 class Note(Base):
     __tablename__ = "notes"
@@ -41,6 +42,19 @@ class Prompt(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", back_populates="prompts")
+
+class PDFBook(Base):
+    __tablename__ = "pdf_books"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String)
+    book_reference = Column(String)
+    file_content = Column(LargeBinary)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", back_populates="pdf_books")
 
 class History(Base):
     __tablename__ = "history"

@@ -64,6 +64,22 @@ class PromptBase(BaseModel):
 class PromptCreate(PromptBase):
     pass
 
+class PDFBookBase(BaseModel):
+    book_reference: str
+
+class PDFBookCreate(PDFBookBase):
+    pass
+
+class PDFBook(PDFBookBase):
+    id: int
+    filename: str
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
 class Prompt(PromptBase):
     id: int
     user_id: int

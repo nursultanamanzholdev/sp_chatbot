@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -91,6 +91,30 @@ async def get_prompts(
     db: Session = Depends(get_db)
 ):
     return db.query(models.Prompt).filter(models.Prompt.user_id == current_user.id).all()
+
+@app.post("/api/pdf-books", response_model=schemas.PDFBook)
+async def upload_pdf_book(
+    file: UploadFile = File(...),
+    book_reference: str = Form(...),
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    
+    contents = await file.read()
+    
+    db_pdf = models.PDFBook(
+        filename=file.filename,
+        book_reference=book_reference,
+        file_content=contents,
+        user_id=current_user.id
+    )
+    
+    db.add(db_pdf)
+    db.commit()
+    db.refresh(db_pdf)
+    return db_pdf
 
 @app.post("/api/prompts", response_model=schemas.Prompt)
 async def create_prompt(
