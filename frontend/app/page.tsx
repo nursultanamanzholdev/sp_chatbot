@@ -36,14 +36,14 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left side with robot illustration */}
-      <div className="hidden md:flex md:w-1/2 bg-[#f8f5f2] items-center justify-center p-8 relative">
+      <div className="hidden md:flex md:w-1/2 bg-[#f9f5ea] items-center justify-center p-8 relative">
         <div className="relative w-full h-full max-w-[600px] max-h-[600px]">
-          <Image src="/robot-illustration.png" alt="AI Learning Assistant" fill className="object-contain" priority />
+          <Image src="/robot-illustration3.png" alt="AI Learning Assistant" fill className="object-contain" priority />
         </div>
       </div>
 
       {/* Right side with login form */}
-      <div className="w-full md:w-1/2 flex flex-col items-center justify-center p-8 bg-white">
+      <div className="w-full md:w-1/2 flex flex-col items-center justify-center p-8 bg-[#ffffff]">
         <div className="absolute top-4 right-4">
           <LanguageSwitcher />
         </div>
