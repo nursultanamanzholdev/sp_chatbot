@@ -24,9 +24,9 @@ class Note(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text)
-    feedback = Column(Text, nullable=True)  # Добавляем поле для обратной связи
+    feedback = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    child_name = Column(String)  # Имя ребенка, к которому относится заметка
+    child_name = Column(String)
     parent_id = Column(Integer, ForeignKey("users.id"))
     parent = relationship("User", back_populates="notes")
 
