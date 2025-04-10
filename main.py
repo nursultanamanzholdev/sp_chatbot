@@ -90,12 +90,17 @@ async def get_prompts(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    return db.query(models.Prompt).filter(models.Prompt.user_id == current_user.id).all()
+    return db.query(models.Prompt).filter(
+        models.Prompt.user_id == current_user.id
+    ).options(
+        joinedload(models.Prompt.pdf_book)
+    ).all()
 
 @app.post("/api/pdf-books", response_model=schemas.PDFBook)
 async def upload_pdf_book(
     file: UploadFile = File(...),
     book_reference: str = Form(...),
+    prompt_id: Optional[int] = Form(None),
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -114,7 +119,44 @@ async def upload_pdf_book(
     db.add(db_pdf)
     db.commit()
     db.refresh(db_pdf)
+
+    # If prompt_id is provided, update the prompt with the pdf_book_id
+    if prompt_id:
+        prompt = db.query(models.Prompt).filter(
+            models.Prompt.id == prompt_id,
+            models.Prompt.user_id == current_user.id
+        ).first()
+        if prompt:
+            prompt.pdf_book_id = db_pdf.id
+            db.commit()
+    
     return db_pdf
+
+@app.delete("/api/pdf-books/{pdf_id}")
+async def delete_pdf_book(
+    pdf_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Find the PDF book
+    db_pdf = db.query(models.PDFBook).filter(
+        models.PDFBook.id == pdf_id,
+        models.PDFBook.user_id == current_user.id
+    ).first()
+
+    if not db_pdf:
+        raise HTTPException(status_code=404, detail="PDF book not found")
+
+    # Remove pdf_book_id reference from any prompts
+    prompts = db.query(models.Prompt).filter(models.Prompt.pdf_book_id == pdf_id).all()
+    for prompt in prompts:
+        prompt.pdf_book_id = None
+
+    # Delete the PDF book
+    db.delete(db_pdf)
+    db.commit()
+
+    return {"message": "PDF book deleted successfully"}
 
 @app.post("/api/prompts", response_model=schemas.Prompt)
 async def create_prompt(

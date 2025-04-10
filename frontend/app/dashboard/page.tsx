@@ -29,6 +29,11 @@ interface LearningPrompt {
   name: string
   prompt: string
   lastModified: string
+  pdf_book?: {
+    id: number
+    book_reference: string
+    filename: string
+  } | null
 }
 
 export default function DashboardPage() {
@@ -71,12 +76,12 @@ export default function DashboardPage() {
       
       // First create the prompt
       const newPrompt = await promptsApi.createPrompt({ name, prompt })
-      setPrompts([...prompts, newPrompt])
       
       // If PDF file and reference are provided, upload the PDF
       if (pdfFile && bookReference.trim()) {
         try {
-          await pdfBooksApi.uploadPDFBook(pdfFile, bookReference)
+          const pdfBook = await pdfBooksApi.uploadPDFBook(pdfFile, bookReference, parseInt(newPrompt.id))
+          newPrompt.pdf_book = pdfBook
           toast({
             title: "Success",
             description: "User prompt and PDF book added successfully",
@@ -95,11 +100,41 @@ export default function DashboardPage() {
           description: "New user prompt added successfully",
         })
       }
+      
+      setPrompts([...prompts, newPrompt])
     } catch (err: any) {
       toast({
         variant: "destructive",
         title: "Error",
         description: err.message || "Failed to add user",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeletePDFBook = async (promptId: string, pdfId: number) => {
+    try {
+      setIsLoading(true)
+      await pdfBooksApi.deletePDFBook(pdfId)
+      
+      // Update the local state to remove the PDF book reference
+      setPrompts(prompts.map(p => {
+        if (p.id === promptId) {
+          return { ...p, pdf_book: null }
+        }
+        return p
+      }))
+      
+      toast({
+        title: "Success",
+        description: "PDF book deleted successfully",
+      })
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to delete PDF book",
       })
     } finally {
       setIsLoading(false)
@@ -229,21 +264,38 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
-                  <div className="mt-4 bg-[#f8f5f2] p-4 rounded-md flex justify-between items-center">
-                    <p>{item.prompt}</p>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)} title={t("editPrompt")}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openDeleteDialog(item)}
-                        title={t("deletePrompt")}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
+                  <div className="mt-4 bg-[#f8f5f2] p-4 rounded-md">
+                    <div className="flex justify-between items-center">
+                      <p>{item.prompt}</p>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)} title={t("editPrompt")}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openDeleteDialog(item)}
+                          title={t("deletePrompt")}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
                     </div>
+                    {item.pdf_book && (
+                      <div className="mt-2 pt-2 border-t border-gray-200 flex justify-between items-center">
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">Book Reference:</span> {item.pdf_book.book_reference}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeletePDFBook(item.id, item.pdf_book!.id)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          Remove Book
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               ))}

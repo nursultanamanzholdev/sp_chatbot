@@ -60,6 +60,7 @@ class TokenData(BaseModel):
 class PromptBase(BaseModel):
     name: str
     prompt: str
+    pdf_book_id: Optional[int] = None
 
 class PromptCreate(PromptBase):
     pass
@@ -85,6 +86,7 @@ class Prompt(PromptBase):
     user_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    pdf_book: Optional['PDFBook'] = None
 
     class Config:
         from_attributes = True

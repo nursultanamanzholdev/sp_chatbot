@@ -38,10 +38,12 @@ class Prompt(Base):
     name = Column(String)
     prompt = Column(Text)
     user_id = Column(Integer, ForeignKey("users.id"))
+    pdf_book_id = Column(Integer, ForeignKey("pdf_books.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", back_populates="prompts")
+    pdf_book = relationship("PDFBook", back_populates="prompts")
 
 class PDFBook(Base):
     __tablename__ = "pdf_books"
@@ -55,6 +57,7 @@ class PDFBook(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", back_populates="pdf_books")
+    prompts = relationship("Prompt", back_populates="pdf_book")
 
 class History(Base):
     __tablename__ = "history"

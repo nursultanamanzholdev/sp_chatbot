@@ -51,10 +51,13 @@ export const userApi = {
 
 // PDF Books API
 export const pdfBooksApi = {
-  uploadPDFBook: async (file: File, bookReference: string) => {
+  uploadPDFBook: async (file: File, bookReference: string, promptId?: number) => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('book_reference', bookReference)
+    if (promptId) {
+      formData.append('prompt_id', promptId.toString())
+    }
 
     const response = await fetch(`${API_URL}/pdf-books`, {
       method: 'POST',
@@ -63,6 +66,13 @@ export const pdfBooksApi = {
         // Don't set Content-Type here, let the browser set it with the boundary
       },
       body: formData,
+    })
+    return handleResponse(response)
+  },
+  deletePDFBook: async (pdfId: number) => {
+    const response = await fetch(`${API_URL}/pdf-books/${pdfId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
     })
     return handleResponse(response)
   },

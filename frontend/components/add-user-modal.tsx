@@ -72,22 +72,34 @@ export function AddUserModal({ open, onOpenChange, onAddUser }: AddUserModalProp
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="pdf">PDF Upload (Optional)</Label>
-              <Input
-                id="pdf"
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="bookReference">Book Reference (Optional)</Label>
-              <Input
-                id="bookReference"
-                value={bookReference}
-                onChange={(e) => setBookReference(e.target.value)}
-                placeholder="Enter book reference"
-              />
+              <Label htmlFor="bookReference">Book Reference Upload PDF (Optional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="bookReference"
+                  value={bookReference}
+                  onChange={(e) => setBookReference(e.target.value)}
+                  placeholder="Enter book reference"
+                  className="flex-1"
+                />
+                <div className="relative">
+                  <Input
+                    id="pdf"
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setPdfFile(file)
+                        // Auto-fill book reference with filename if empty
+                        if (!bookReference) {
+                          setBookReference(file.name.replace(/\.pdf$/, ''))
+                        }
+                      }
+                    }}
+                    className="w-[120px]"
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
