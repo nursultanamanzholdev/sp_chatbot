@@ -13,12 +13,15 @@ async function handleResponse(response: Response) {
 }
 
 // Helper function to get auth headers
-function getAuthHeaders() {
+function getAuthHeaders(isFormData = false) {
   const token = localStorage.getItem("auth_token")
-  return {
-    "Content-Type": "application/json",
+  const headers: Record<string, string> = {
     Authorization: token ? `Bearer ${token}` : "",
   }
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json"
+  }
+  return headers
 }
 
 // User API
@@ -61,10 +64,7 @@ export const pdfBooksApi = {
 
     const response = await fetch(`${API_URL}/pdf-books`, {
       method: 'POST',
-      headers: {
-        ...getAuthHeaders(),
-        // Don't set Content-Type here, let the browser set it with the boundary
-      },
+      headers: getAuthHeaders(true),
       body: formData,
     })
     return handleResponse(response)

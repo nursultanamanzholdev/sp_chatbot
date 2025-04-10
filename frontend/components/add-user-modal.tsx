@@ -72,7 +72,7 @@ export function AddUserModal({ open, onOpenChange, onAddUser }: AddUserModalProp
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="bookReference">Book Reference Upload PDF (Optional)</Label>
+              <Label htmlFor="bookReference">Book Upload PDF (Optional)</Label>
               <div className="flex gap-2">
                 <Input
                   id="bookReference"
@@ -96,7 +96,7 @@ export function AddUserModal({ open, onOpenChange, onAddUser }: AddUserModalProp
                         }
                       }
                     }}
-                    className="w-[120px]"
+                    className="w-[100px]"
                   />
                 </div>
               </div>

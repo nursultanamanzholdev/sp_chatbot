@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Pencil, Plus, Trash2, Loader2 } from "lucide-react"
+import { Pencil, Plus, Trash2, Loader2, Upload } from "lucide-react"
 import { AddUserModal } from "@/components/add-user-modal"
+import { BookUploadModal } from "@/components/book-upload-modal"
 import { useLocale } from "@/lib/locale-context"
 import { promptsApi, pdfBooksApi } from "@/lib/api"
 import { Sidebar } from "@/components/sidebar"
@@ -28,7 +29,8 @@ interface LearningPrompt {
   id: string
   name: string
   prompt: string
-  lastModified: string
+  created_at: string
+  updated_at: string | null
   pdf_book?: {
     id: number
     book_reference: string
@@ -42,6 +44,7 @@ export default function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isBookUploadOpen, setIsBookUploadOpen] = useState(false)
   const [prompts, setPrompts] = useState<LearningPrompt[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -260,29 +263,33 @@ export default function DashboardPage() {
                   <div className="mb-2">
                     <h2 className="text-xl font-bold">{`${item.name}'s ${t("learningPrompt")}`}</h2>
                     <p className="text-sm text-gray-500">
-                      {t("lastModified")}: {item.lastModified}
+                      {t("lastModified")}: {new Date(item.updated_at || item.created_at).toLocaleString()}
                     </p>
                   </div>
 
                   <div className="mt-4 bg-[#f8f5f2] p-4 rounded-md">
-                    <div className="flex justify-between items-center">
-                      <p>{item.prompt}</p>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)} title={t("editPrompt")}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDeleteDialog(item)}
-                          title={t("deletePrompt")}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <p>{item.prompt}</p>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)} title={t("editPrompt")}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDeleteDialog(item)}
+                            title={t("deletePrompt")}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
+
                     </div>
-                    {item.pdf_book && (
+                    {item.pdf_book ? (
                       <div className="mt-2 pt-2 border-t border-gray-200 flex justify-between items-center">
+
                         <div className="text-sm text-gray-600">
                           <span className="font-medium">Book Reference:</span> {item.pdf_book.book_reference}
                         </div>
@@ -293,6 +300,21 @@ export default function DashboardPage() {
                           className="text-red-500 hover:text-red-600"
                         >
                           Remove Book
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="mt-2 pt-2 border-t border-gray-200 flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPrompt(item)
+                            setIsBookUploadOpen(true)
+                          }}
+                          className="text-blue-500 hover:text-blue-600"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Add Book
                         </Button>
                       </div>
                     )}
@@ -328,6 +350,37 @@ export default function DashboardPage() {
       </AlertDialog>
 
       {/* Edit Prompt Dialog */}
+      <BookUploadModal
+        open={isBookUploadOpen}
+        onOpenChange={setIsBookUploadOpen}
+        onUpload={async (file, bookReference) => {
+          if (selectedPrompt) {
+            try {
+              setIsLoading(true)
+              const pdfBook = await pdfBooksApi.uploadPDFBook(file, bookReference, parseInt(selectedPrompt.id))
+              setPrompts(prompts.map(p => {
+                if (p.id === selectedPrompt.id) {
+                  return { ...p, pdf_book: pdfBook }
+                }
+                return p
+              }))
+              toast({
+                title: "Success",
+                description: "Book uploaded successfully",
+              })
+            } catch (err: any) {
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: err.message || "Failed to upload book",
+              })
+            } finally {
+              setIsLoading(false)
+            }
+          }
+        }}
+      />
+
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
