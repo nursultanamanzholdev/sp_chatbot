@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, LargeBinary
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -51,7 +51,7 @@ class PDFBook(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String)
     book_reference = Column(String)
-    file_content = Column(LargeBinary)
+    json_content = Column(JSON)  # Changed from file_content to json_content
     user_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

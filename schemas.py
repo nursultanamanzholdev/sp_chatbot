@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, constr
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import re
 
 # Регулярное выражение для казахстанского номера телефона
@@ -75,6 +75,7 @@ class PDFBook(PDFBookBase):
     id: int
     filename: str
     user_id: int
+    json_content: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

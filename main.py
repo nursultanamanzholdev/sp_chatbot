@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
@@ -8,6 +8,14 @@ import models
 import schemas
 import auth
 from database import engine, get_db
+import os
+import json
+import tempfile
+from pdf2json.gpt import process as pdf_to_json_process
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -99,28 +107,37 @@ async def get_prompts(
 
 @app.post("/api/pdf-books", response_model=schemas.PDFBook)
 async def upload_pdf_book(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     book_reference: str = Form(...),
     prompt_id: Optional[int] = Form(None),
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="File must be a PDF")
+    # Create a directory in the project for PDF processing if it doesn't exist
+    output_dir = os.path.join(os.getcwd(), "pdf2json", "output")
+    os.makedirs(output_dir, exist_ok=True)
     
-    contents = await file.read()
+    # Save the uploaded file to the output directory
+    file_path = os.path.join(output_dir, file.filename)
     
+    # Save the file content to disk
+    file_content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(file_content)
+    
+    # Create a new PDFBook record in the database with initial status
     db_pdf = models.PDFBook(
         filename=file.filename,
         book_reference=book_reference,
-        file_content=contents,
+        json_content={"status": "processing"},
         user_id=current_user.id
     )
     
     db.add(db_pdf)
     db.commit()
     db.refresh(db_pdf)
-
+    
     # If prompt_id is provided, update the prompt with the pdf_book_id
     if prompt_id:
         prompt = db.query(models.Prompt).filter(
@@ -131,7 +148,136 @@ async def upload_pdf_book(
             prompt.pdf_book_id = db_pdf.id
             db.commit()
     
+    # Process the PDF in the background
+    background_tasks.add_task(
+        process_pdf_to_json,
+        file_path=file_path,
+        db_pdf_id=db_pdf.id,
+        user_id=current_user.id,
+        db=db
+    )
+    
     return db_pdf
+
+@app.get("/api/pdf-books", response_model=list[schemas.PDFBook])
+async def get_pdf_books(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    return db.query(models.PDFBook).filter(
+        models.PDFBook.user_id == current_user.id
+    ).all()
+
+async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: Session):
+    """Process PDF to JSON in the background and update the database when complete"""
+    try:
+        # Get the filename and directory
+        filename = os.path.basename(file_path)
+        folder = os.path.dirname(file_path)
+        
+        # Get OpenAI API key from environment variable
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise Exception("OpenAI API key not found in environment variables")
+        
+        # Process the PDF to JSON
+        pdf_to_json_process(
+            filename=filename,
+            folder=folder,
+            api_key=api_key,
+            verbose=True,
+            cleanup=False  # Don't clean up so we keep the output files
+        )
+        
+        # The JSON file will be named as filename_combined.json in the output folder
+        # Check multiple possible locations for the JSON file
+        possible_paths = [
+            os.path.join(folder, f"{filename}_combined.json"),
+            os.path.join(folder, f"{filename}_output", f"{filename}_combined.json"),
+            os.path.join(folder, f"{os.path.splitext(filename)[0]}_final_folders", f"{filename}_combined.json")
+        ]
+        
+        json_file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                json_file_path = path
+                break
+                
+        # If we still don't have a path, try to search for it
+        if not json_file_path:
+            for root, dirs, files in os.walk(folder):
+                for file in files:
+                    if file.endswith("_combined.json"):
+                        json_file_path = os.path.join(root, file)
+                        break
+                if json_file_path:
+                    break
+        
+        # Check if the JSON file was found
+        if not json_file_path:
+            raise Exception("Failed to find the generated JSON file")
+        
+        # Read the JSON file
+        with open(json_file_path, "r") as json_file:
+            json_content = json.load(json_file)
+        
+        # Update the database with the JSON content and set status to complete
+        db_pdf = db.query(models.PDFBook).filter(
+            models.PDFBook.id == db_pdf_id,
+            models.PDFBook.user_id == user_id
+        ).first()
+        
+        if db_pdf:
+            # Add a status field to indicate processing is complete
+            if isinstance(json_content, dict):
+                json_content["status"] = "complete"
+            else:
+                # If json_content is not a dict, wrap it in a dict with status
+                json_content = {
+                    "status": "complete",
+                    "data": json_content
+                }
+            
+            db_pdf.json_content = json_content
+            db.commit()
+            print(f"Successfully updated database with JSON content for PDF ID {db_pdf_id}")
+            
+    except Exception as e:
+        print(f"Error processing PDF: {str(e)}")
+        # Update the database with the error
+        db_pdf = db.query(models.PDFBook).filter(
+            models.PDFBook.id == db_pdf_id,
+            models.PDFBook.user_id == user_id
+        ).first()
+        
+        if db_pdf:
+            db_pdf.json_content = {"status": "error", "message": str(e)}
+            db.commit()
+
+@app.get("/api/pdf-books/{pdf_id}/status", response_model=dict)
+async def get_pdf_book_status(
+    pdf_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Find the PDF book
+    db_pdf = db.query(models.PDFBook).filter(
+        models.PDFBook.id == pdf_id,
+        models.PDFBook.user_id == current_user.id
+    ).first()
+
+    if not db_pdf:
+        raise HTTPException(status_code=404, detail="PDF book not found")
+    
+    # Check the status in the json_content field
+    if not db_pdf.json_content:
+        return {"status": "unknown"}
+    
+    if isinstance(db_pdf.json_content, dict) and "status" in db_pdf.json_content:
+        return {"status": db_pdf.json_content["status"], "message": db_pdf.json_content.get("message", "")}
+    
+    # If json_content exists and doesn't have a status field, it means processing is complete
+    return {"status": "complete"}
 
 @app.delete("/api/pdf-books/{pdf_id}")
 async def delete_pdf_book(
@@ -168,7 +314,8 @@ async def create_prompt(
     db_prompt = models.Prompt(
         name=prompt.name,
         prompt=prompt.prompt,
-        user_id=current_user.id
+        user_id=current_user.id,
+        pdf_book_id=prompt.pdf_book_id
     )
     db.add(db_prompt)
     db.commit()

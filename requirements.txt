@@ -7,4 +7,9 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.6
 psycopg2-binary==2.9.9
-starlette==0.27.0 
+python-dotenv==1.0.0
+requests==2.32.3
+Pillow==10.1.0
+pypdfium2==4.24.0
+split-image==2.0.1
+typer==0.9.0
