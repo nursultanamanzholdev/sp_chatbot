@@ -254,10 +254,11 @@ def process(filename, folder, api_key, user_prompt: str = None,
             # Remove the errors folder if it is empty
             shutil.rmtree(errors_folder, ignore_errors=True)
 
+        return combined_json
+
     except Exception as error:
         print(f"An error occurred: {error}")
-        # exit the program on error
-        sys.exit()
+        raise Exception(f"PDF processing failed: {str(error)}")
 
 
 def create_combined_json(extracted_data, title, all_text_content, headers, model, verbose=False):
@@ -317,7 +318,7 @@ def create_combined_json(extracted_data, title, all_text_content, headers, model
             elif "context" in item and item["context"]:  # Only add if not empty
                 paragraph = {
                     "context": item["context"],
-                    "id": f"C_{random.randint(100000, 999999)}_1"
+                    "id": f"C_{random.randint(100000, 999999)}_default"
                 }
                 combined_json["data"][0]["paragraphs"].append(paragraph)
                 

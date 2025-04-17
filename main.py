@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
 from datetime import timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import models
 import schemas
 import auth
@@ -12,6 +12,7 @@ import os
 import json
 import tempfile
 from pdf2json.gpt import process as pdf_to_json_process
+from pdf2json.book2dial import process_json_data
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -181,7 +182,7 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
             raise Exception("OpenAI API key not found in environment variables")
         
         # Process the PDF to JSON
-        pdf_to_json_process(
+        combined_json = pdf_to_json_process(
             filename=filename,
             folder=folder,
             api_key=api_key,
@@ -189,37 +190,8 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
             cleanup=False  # Don't clean up so we keep the output files
         )
         
-        # The JSON file will be named as filename_combined.json in the output folder
-        # Check multiple possible locations for the JSON file
-        possible_paths = [
-            os.path.join(folder, f"{filename}_combined.json"),
-            os.path.join(folder, f"{filename}_output", f"{filename}_combined.json"),
-            os.path.join(folder, f"{os.path.splitext(filename)[0]}_final_folders", f"{filename}_combined.json")
-        ]
-        
-        json_file_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                json_file_path = path
-                break
-                
-        # If we still don't have a path, try to search for it
-        if not json_file_path:
-            for root, dirs, files in os.walk(folder):
-                for file in files:
-                    if file.endswith("_combined.json"):
-                        json_file_path = os.path.join(root, file)
-                        break
-                if json_file_path:
-                    break
-        
-        # Check if the JSON file was found
-        if not json_file_path:
-            raise Exception("Failed to find the generated JSON file")
-        
-        # Read the JSON file
-        with open(json_file_path, "r") as json_file:
-            json_content = json.load(json_file)
+        # Generate dialogs from the JSON data
+        dialogs = process_json_data(combined_json)
         
         # Update the database with the JSON content and set status to complete
         db_pdf = db.query(models.PDFBook).filter(
@@ -229,16 +201,16 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
         
         if db_pdf:
             # Add a status field to indicate processing is complete
-            if isinstance(json_content, dict):
-                json_content["status"] = "complete"
+            if isinstance(dialogs, dict):
+                dialogs["status"] = "complete"
             else:
-                # If json_content is not a dict, wrap it in a dict with status
-                json_content = {
+                # If dialogs is not a dict, wrap it in a dict with status
+                dialogs = {
                     "status": "complete",
-                    "data": json_content
+                    "data": dialogs
                 }
             
-            db_pdf.json_content = json_content
+            db_pdf.json_content = dialogs
             db.commit()
             print(f"Successfully updated database with JSON content for PDF ID {db_pdf_id}")
             
