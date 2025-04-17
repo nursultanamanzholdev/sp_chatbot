@@ -69,6 +69,21 @@ export const pdfBooksApi = {
     })
     return handleResponse(response)
   },
+  
+  getPDFBooks: async () => {
+    const response = await fetch(`${API_URL}/pdf-books`, {
+      headers: getAuthHeaders(),
+    })
+    return handleResponse(response)
+  },
+  
+  getPDFBookStatus: async (pdfId: number) => {
+    const response = await fetch(`${API_URL}/pdf-books/${pdfId}/status`, {
+      headers: getAuthHeaders(),
+    })
+    return handleResponse(response)
+  },
+  
   deletePDFBook: async (pdfId: number) => {
     const response = await fetch(`${API_URL}/pdf-books/${pdfId}`, {
       method: 'DELETE',
@@ -123,4 +138,3 @@ export const historyApi = {
     return handleResponse(response)
   },
 }
-
