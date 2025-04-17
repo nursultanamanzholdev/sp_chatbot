@@ -1,9 +1,14 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
 
-# replace with your DB
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:1105@localhost:5432/family_app"
+# Load environment variables from .env file
+load_dotenv()
+
+# Get database URL from environment variable
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -15,4 +20,4 @@ def get_db():
     try:
         yield db
     finally:
-        db.close() 
+        db.close()
