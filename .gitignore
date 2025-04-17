@@ -20,6 +20,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+pdf2json/output/*
+!pdf2json/output/.gitkeep
 
 # Node
 node_modules/
