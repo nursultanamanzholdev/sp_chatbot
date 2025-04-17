@@ -2,8 +2,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# replace with you DB
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/family_app"
+# replace with your DB
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:1105@localhost:5432/family_app"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
