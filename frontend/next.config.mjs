@@ -28,6 +28,9 @@ const nextConfig = {
     parallelServerCompiles: true,
   },
   output: 'standalone',
+  // Enable server-side rendering in production
+  distDir: 'next',
+  poweredByHeader: false,
   async rewrites() {
     // Use environment-specific API URLs
     const apiBaseUrl = process.env.NODE_ENV === 'production' 

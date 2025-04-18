@@ -4,4 +4,4 @@ services:
     env: node
     buildCommand: pnpm install --no-frozen-lockfile && pnpm build
     startCommand: pnpm start
-    publishDirectory: .next 
+    publishDirectory: next 
