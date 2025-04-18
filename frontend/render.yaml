@@ -1,7 +1,6 @@
 services:
   - type: web
     name: frontend
-    env: node
-    buildCommand: pnpm install --no-frozen-lockfile && pnpm build
-    startCommand: pnpm start
-    publishDirectory: next 
+    env: static
+    buildCommand: pnpm install --no-frozen-lockfile && pnpm build && mkdir -p next && cp -r out/* next/
+    staticPublishPath: ./next 
