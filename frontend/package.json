@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "render-build": "pnpm install --no-frozen-lockfile && next build"
+    "render-build": "pnpm install --no-frozen-lockfile && next build && cp -r .next next"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

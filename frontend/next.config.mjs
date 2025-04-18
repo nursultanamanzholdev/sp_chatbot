@@ -27,15 +27,21 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  output: 'standalone',
   async rewrites() {
+    // Use environment-specific API URLs
+    const apiBaseUrl = process.env.NODE_ENV === 'production' 
+      ? process.env.NEXT_PUBLIC_API_URL || 'https://api.example.com' 
+      : 'http://localhost:8000';
+    
     return [
       {
         source: '/token',
-        destination: 'http://localhost:8000/token',
+        destination: `${apiBaseUrl}/token`,
       },
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
+        destination: `${apiBaseUrl}/api/:path*`,
       },
     ]
   },
