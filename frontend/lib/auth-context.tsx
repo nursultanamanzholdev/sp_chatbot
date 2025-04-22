@@ -4,6 +4,9 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
+// Backend URL
+const BACKEND_URL = "https://chatbot-backend-iskc.onrender.com"
+
 interface User {
   id: string
   name: string
@@ -37,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedToken) {
         try {
           setIsLoading(true)
-          const response = await fetch("/api/users/profile", {
+          const response = await fetch(`${BACKEND_URL}/api/users/profile`, {
             headers: {
               Authorization: `Bearer ${storedToken}`,
             },
@@ -73,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       formData.append("username", email)
       formData.append("password", password)
 
-      const response = await fetch("/token", {
+      const response = await fetch(`${BACKEND_URL}/token`, {
         method: "POST",
         body: formData,
       })
@@ -88,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(data.access_token)
       
       // Get user profile
-      const userResponse = await fetch("/api/users/profile", {
+      const userResponse = await fetch(`${BACKEND_URL}/api/users/profile`, {
         headers: {
           Authorization: `Bearer ${data.access_token}`,
         },

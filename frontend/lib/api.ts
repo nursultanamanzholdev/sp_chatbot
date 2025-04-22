@@ -1,7 +1,7 @@
 // API service for handling requests to the backend
 
 // Base API URL
-const API_URL = "/api"
+const API_URL = "https://chatbot-backend-iskc.onrender.com/api"
 
 // Helper function to handle API responses
 async function handleResponse(response: Response) {
