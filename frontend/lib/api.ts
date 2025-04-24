@@ -102,7 +102,7 @@ export const promptsApi = {
     return handleResponse(response)
   },
 
-  createPrompt: async (promptData: { name: string; prompt: string }) => {
+  createPrompt: async (promptData: { name: string; prompt: string; mode?: string }) => {
     const response = await fetch(`${API_URL}/prompts`, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -111,7 +111,7 @@ export const promptsApi = {
     return handleResponse(response)
   },
 
-  updatePrompt: async (id: string, promptData: { prompt: string }) => {
+  updatePrompt: async (id: string, promptData: { prompt: string; mode?: string }) => {
     const response = await fetch(`${API_URL}/prompts/${id}`, {
       method: "PUT",
       headers: getAuthHeaders(),

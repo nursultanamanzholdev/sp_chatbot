@@ -16,11 +16,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useLocale } from "@/lib/locale-context"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 interface AddUserModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAddUser: (name: string, prompt: string, pdfFile: File | null, bookReference: string) => void
+  onAddUser: (name: string, prompt: string, pdfFile: File | null, bookReference: string, mode: string) => void
 }
 
 export function AddUserModal({ open, onOpenChange, onAddUser }: AddUserModalProps) {
@@ -28,16 +29,18 @@ export function AddUserModal({ open, onOpenChange, onAddUser }: AddUserModalProp
   const [prompt, setPrompt] = useState("")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [bookReference, setBookReference] = useState("")
+  const [mode, setMode] = useState("chat")
   const { t } = useLocale()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim() && prompt.trim()) {
-      onAddUser(name, prompt, pdfFile, bookReference)
+      onAddUser(name, prompt, pdfFile, bookReference, mode)
       setName("")
       setPrompt("")
       setPdfFile(null)
       setBookReference("")
+      setMode("chat")
       onOpenChange(false)
     }
   }
@@ -70,6 +73,19 @@ export function AddUserModal({ open, onOpenChange, onAddUser }: AddUserModalProp
                 placeholder={t("enterPrompt")}
                 required
               />
+            </div>
+            <div className="grid gap-2">
+              <Label>Interaction Mode</Label>
+              <RadioGroup value={mode} onValueChange={setMode} className="flex space-x-4">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="chat" id="chat" />
+                  <Label htmlFor="chat" className="cursor-pointer">Chat Mode</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="lecture" id="lecture" />
+                  <Label htmlFor="lecture" className="cursor-pointer">Lecture Mode</Label>
+                </div>
+              </RadioGroup>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="bookReference">Book Upload PDF (Optional)</Label>

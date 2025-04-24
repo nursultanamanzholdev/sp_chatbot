@@ -61,6 +61,7 @@ class PromptBase(BaseModel):
     name: str
     prompt: str
     pdf_book_id: Optional[int] = None
+    mode: Optional[str] = "chat"
 
 class PromptCreate(PromptBase):
     pass
@@ -94,6 +95,7 @@ class Prompt(PromptBase):
 
 class PromptUpdate(BaseModel):
     prompt: str
+    mode: Optional[str] = None
 
 class HistoryBase(BaseModel):
     prompt_id: int

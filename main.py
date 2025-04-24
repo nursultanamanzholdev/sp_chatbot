@@ -287,7 +287,8 @@ async def create_prompt(
         name=prompt.name,
         prompt=prompt.prompt,
         user_id=current_user.id,
-        pdf_book_id=prompt.pdf_book_id
+        pdf_book_id=prompt.pdf_book_id,
+        mode=prompt.mode
     )
     db.add(db_prompt)
     db.commit()
@@ -308,6 +309,8 @@ async def update_prompt(
     if not db_prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
     db_prompt.prompt = prompt_update.prompt
+    if prompt_update.mode is not None:
+        db_prompt.mode = prompt_update.mode
     db.commit()
     db.refresh(db_prompt)
     return db_prompt

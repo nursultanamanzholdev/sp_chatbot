@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 interface PDFBookStatus {
   status: string;
@@ -41,6 +42,7 @@ interface LearningPrompt {
   id: string
   name: string
   prompt: string
+  mode: string
   created_at: string
   updated_at: string | null
   pdf_book?: PDFBook | null
@@ -185,12 +187,12 @@ export default function DashboardPage() {
     }
   }
 
-  const handleAddUser = async (name: string, prompt: string, pdfFile: File | null, bookReference: string) => {
+  const handleAddUser = async (name: string, prompt: string, pdfFile: File | null, bookReference: string, mode: string) => {
     try {
       setIsLoading(true)
       
       // First create the prompt
-      const newPrompt = await promptsApi.createPrompt({ name, prompt })
+      const newPrompt = await promptsApi.createPrompt({ name, prompt, mode })
       
       // If PDF file and reference are provided, upload the PDF
       if (pdfFile && bookReference.trim()) {
@@ -198,42 +200,40 @@ export default function DashboardPage() {
           const pdfBook = await pdfBooksApi.uploadPDFBook(pdfFile, bookReference, parseInt(newPrompt.id))
           newPrompt.pdf_book = pdfBook
           
-          // Set initial status and start polling
-          setPdfStatuses(prev => ({
-            ...prev,
-            [pdfBook.id]: { status: "processing" }
-          }))
-          
+          // Start polling for status
           checkPdfStatus(pdfBook.id)
+          startStatusPolling()
           
           toast({
-            title: "Success",
-            description: "User prompt added and PDF book is being processed",
+            title: "Processing PDF",
+            description: "Your PDF is being processed. This may take a few minutes.",
           })
         } catch (pdfErr: any) {
-          // If PDF upload fails, still show success for prompt but warn about PDF
+          console.error("Error uploading PDF:", pdfErr)
           toast({
             variant: "destructive",
-            title: "Warning",
-            description: `User prompt added but PDF upload failed: ${pdfErr.message || "Unknown error"}`
+            title: "PDF Upload Error",
+            description: pdfErr.message || "Failed to upload PDF",
           })
         }
-      } else {
-        toast({
-          title: "Success",
-          description: "New user prompt added successfully",
-        })
       }
       
-      setPrompts([...prompts, newPrompt])
+      // Add the new prompt to the list
+      setPrompts((prevPrompts) => [...prevPrompts, newPrompt])
+      
+      toast({
+        title: "Success",
+        description: "New prompt has been created",
+      })
     } catch (err: any) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: err.message || "Failed to add user",
+        description: err.message || "Failed to create prompt",
       })
     } finally {
       setIsLoading(false)
+      setIsModalOpen(false)
     }
   }
 
@@ -290,27 +290,27 @@ export default function DashboardPage() {
   }
 
   const handleEditPrompt = async () => {
-    if (!selectedPrompt || !editPromptText.trim()) return
-
+    if (!selectedPrompt || !editPromptText) return
+    
     try {
       setIsLoading(true)
-      const updatedPrompt = await promptsApi.updatePrompt(selectedPrompt.id, { prompt: editPromptText })
-      setPrompts(
-        prompts.map((p) =>
-          p.id === selectedPrompt.id
-            ? {
-                ...p,
-                prompt: editPromptText,
-                lastModified: new Date().toISOString().split("T")[0],
-              }
-            : p,
-        ),
+      const updatedPrompt = await promptsApi.updatePrompt(
+        selectedPrompt.id,
+        { 
+          prompt: editPromptText,
+          mode: selectedPrompt.mode 
+        }
       )
+      
+      // Update the prompts list with the edited prompt
+      setPrompts((prevPrompts) =>
+        prevPrompts.map((p) => (p.id === selectedPrompt.id ? updatedPrompt : p))
+      )
+      
       setIsEditDialogOpen(false)
-      setSelectedPrompt(null)
       toast({
         title: "Success",
-        description: "Prompt updated successfully",
+        description: "Prompt has been updated",
       })
     } catch (err: any) {
       toast({
@@ -529,61 +529,49 @@ export default function DashboardPage() {
       </AlertDialog>
 
       {/* Edit Prompt Dialog */}
-      <BookUploadModal
-        open={isBookUploadOpen}
-        onOpenChange={setIsBookUploadOpen}
-        onUpload={async (file, bookReference) => {
-          if (selectedPrompt) {
-            try {
-              setIsLoading(true)
-              const pdfBook = await pdfBooksApi.uploadPDFBook(file, bookReference, parseInt(selectedPrompt.id))
-              setPrompts(prompts.map(p => {
-                if (p.id === selectedPrompt.id) {
-                  return { ...p, pdf_book: pdfBook }
-                }
-                return p
-              }))
-              toast({
-                title: "Success",
-                description: "Book uploaded successfully",
-              })
-            } catch (err: any) {
-              toast({
-                variant: "destructive",
-                title: "Error",
-                description: err.message || "Failed to upload book",
-              })
-            } finally {
-              setIsLoading(false)
-            }
-          }
-        }}
-      />
-
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>{t("editPrompt")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="edit-prompt">{t("learningPrompt")}</Label>
+              <Label htmlFor="editPrompt">{t("prompt")}</Label>
               <Textarea
-                id="edit-prompt"
+                id="editPrompt"
                 value={editPromptText}
                 onChange={(e) => setEditPromptText(e.target.value)}
-                placeholder={t("enterPrompt")}
-                className="min-h-[100px]"
-                required
+                className="h-32"
               />
+            </div>
+            <div className="grid gap-2">
+              <Label>Interaction Mode</Label>
+              <RadioGroup 
+                value={selectedPrompt?.mode || "chat"} 
+                onValueChange={(value) => {
+                  if (selectedPrompt) {
+                    setSelectedPrompt({...selectedPrompt, mode: value});
+                  }
+                }}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="chat" id="edit-chat" />
+                  <Label htmlFor="edit-chat" className="cursor-pointer">Chat Mode</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="lecture" id="edit-lecture" />
+                  <Label htmlFor="edit-lecture" className="cursor-pointer">Lecture Mode</Label>
+                </div>
+              </RadioGroup>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isLoading}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               {t("cancel")}
             </Button>
-            <Button onClick={handleEditPrompt} disabled={isLoading || !editPromptText.trim()}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            <Button onClick={handleEditPrompt} disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {t("save")}
             </Button>
           </DialogFooter>
