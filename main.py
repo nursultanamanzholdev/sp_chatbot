@@ -14,6 +14,7 @@ import tempfile
 from pdf2json.gpt import process as pdf_to_json_process
 from pdf2json.book2dial import process_json_data
 from dotenv import load_dotenv
+import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -115,17 +116,23 @@ async def upload_pdf_book(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Create a directory in the project for PDF processing if it doesn't exist
-    output_dir = os.path.join(os.getcwd(), "pdf2json", "output")
-    os.makedirs(output_dir, exist_ok=True)
+    # Create a temporary directory for PDF processing if it doesn't exist
+    temp_dir = os.path.join(os.getcwd(), "temp_uploads")
+    os.makedirs(temp_dir, exist_ok=True)
     
-    # Save the uploaded file to the output directory
-    file_path = os.path.join(output_dir, file.filename)
+    # Generate a unique filename to avoid collisions
+    timestamp = int(time.time())
+    unique_filename = f"{timestamp}_{file.filename}"
+    file_path = os.path.join(temp_dir, unique_filename)
     
-    # Save the file content to disk
+    print(f"[Upload] Received PDF upload: {file.filename}, saving as: {unique_filename}")
+    
+    # Save the file content to disk temporarily
     file_content = await file.read()
     with open(file_path, "wb") as f:
         f.write(file_content)
+    
+    print(f"[Upload] PDF file saved to: {file_path}")
     
     # Create a new PDFBook record in the database with initial status
     db_pdf = models.PDFBook(
@@ -139,6 +146,8 @@ async def upload_pdf_book(
     db.commit()
     db.refresh(db_pdf)
     
+    print(f"[Upload] Created new PDF book record with ID: {db_pdf.id}")
+    
     # If prompt_id is provided, update the prompt with the pdf_book_id
     if prompt_id:
         prompt = db.query(models.Prompt).filter(
@@ -148,6 +157,7 @@ async def upload_pdf_book(
         if prompt:
             prompt.pdf_book_id = db_pdf.id
             db.commit()
+            print(f"[Upload] Associated PDF with prompt ID: {prompt_id}")
     
     # Process the PDF in the background
     background_tasks.add_task(
@@ -157,6 +167,8 @@ async def upload_pdf_book(
         user_id=current_user.id,
         db=db
     )
+    
+    print(f"[Upload] Started background task for processing PDF ID: {db_pdf.id}")
     
     return db_pdf
 
@@ -176,23 +188,28 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
         filename = os.path.basename(file_path)
         folder = os.path.dirname(file_path)
         
+        print(f"[PDF2JSON] Starting processing for PDF: {filename} (ID: {db_pdf_id})")
+        
         # Get OpenAI API key from environment variable
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise Exception("OpenAI API key not found in environment variables")
         
+        print(f"[PDF2JSON] Converting PDF to structured JSON")
         # Process the PDF to JSON
         combined_json = pdf_to_json_process(
             filename=filename,
             folder=folder,
             api_key=api_key,
             verbose=True,
-            cleanup=False  # Don't clean up so we keep the output files
+            cleanup=True  # Clean up temporary files
         )
         
-        # Generate dialogs from the JSON data
+        print(f"[PDF2JSON] Generating dialogs from structured JSON")
+        # Generate dialogs from the JSON data - no file saving
         dialogs = process_json_data(combined_json)
         
+        print(f"[PDF2JSON] Dialog generation complete, saving to database")
         # Update the database with the JSON content and set status to complete
         db_pdf = db.query(models.PDFBook).filter(
             models.PDFBook.id == db_pdf_id,
@@ -200,22 +217,20 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
         ).first()
         
         if db_pdf:
-            # Add a status field to indicate processing is complete
-            if isinstance(dialogs, dict):
-                dialogs["status"] = "complete"
-            else:
-                # If dialogs is not a dict, wrap it in a dict with status
-                dialogs = {
-                    "status": "complete",
-                    "data": dialogs
-                }
-            
             db_pdf.json_content = dialogs
             db.commit()
-            print(f"Successfully updated database with JSON content for PDF ID {db_pdf_id}")
+            print(f"[PDF2JSON] Successfully updated database with dialogs for PDF ID {db_pdf_id}")
+            
+            # Delete the temporary PDF file
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"[PDF2JSON] Temporary PDF file removed: {file_path}")
+            except Exception as file_error:
+                print(f"[PDF2JSON] Warning: Could not remove temporary PDF file: {str(file_error)}")
             
     except Exception as e:
-        print(f"Error processing PDF: {str(e)}")
+        print(f"[PDF2JSON] Error processing PDF: {str(e)}")
         # Update the database with the error
         db_pdf = db.query(models.PDFBook).filter(
             models.PDFBook.id == db_pdf_id,
@@ -225,6 +240,15 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
         if db_pdf:
             db_pdf.json_content = {"status": "error", "message": str(e)}
             db.commit()
+            print(f"[PDF2JSON] Updated database with error status for PDF ID {db_pdf_id}")
+        
+        # Delete the temporary PDF file
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"[PDF2JSON] Temporary PDF file removed after error: {file_path}")
+        except Exception as file_error:
+            print(f"[PDF2JSON] Warning: Could not remove temporary PDF file: {str(file_error)}")
 
 @app.get("/api/pdf-books/{pdf_id}/status", response_model=dict)
 async def get_pdf_book_status(

@@ -52,13 +52,15 @@ def generate_prompt2(chapter_title, section_title,context, chapter_summary, bold
 def generate_response0(prompt, model):
     while True:
         try:
+            print(f"[Book2Dial] Sending request to OpenAI API with model: {model}")
             completion = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}]
              )
+            print(f"[Book2Dial] Successfully received response from OpenAI API")
             return completion
-        except:
-            print("Error occurred while generating response. Retrying in 2 seconds...")
+        except Exception as e:
+            print(f"[Book2Dial] Error occurred while generating response: {str(e)}. Retrying in 2 seconds...")
             time.sleep(2)
 
 def generate_question(chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation, model):
@@ -69,7 +71,7 @@ def generate_question(chapter_title, section_title, chapter_summary, bold_terms,
     return question
 def generate_answer(question, context, chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation, model):
     if not question:
-        print('Empty question was given as input.')
+        print('[Book2Dial] Empty question was given as input.')
         return None
     prompt = generate_prompt2(chapter_title, section_title, context, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation,question)
     completion = generate_response0(prompt, model)
@@ -88,6 +90,7 @@ def make_json_friendly(s):
     return s
 
 def generate_dialog_for_section(section, model_name, turns=12):
+    print(f"[Book2Dial] Generating dialog for section: {section.get('title', 'Unknown section')}")
     chapter_title = section.get("title", "")
     paragraphs = section.get("paragraphs", [])
     context = paragraphs[0]["context"] if paragraphs else ""
@@ -112,12 +115,13 @@ def generate_dialog_for_section(section, model_name, turns=12):
     
     
     dialogs = []
-    for _ in range(turns // 2):
+    for i in range(turns // 2):
+        print(f"[Book2Dial] Generating dialog turn {i+1}/{turns//2}")
         question = generate_question(chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation, model_name)
-        # print('question:',question)
+        print(f"[Book2Dial] Generated question: {question[:50]}...")
         
         answer = generate_answer(question, context, chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation, model_name)
-        # print('answer:',answer)
+        print(f"[Book2Dial] Generated answer: {answer[:50]}...")
 
         
         dialogs.append({
@@ -126,69 +130,50 @@ def generate_dialog_for_section(section, model_name, turns=12):
         })
         previous_conversation += f"\nStudent: {question}\nTeacher: {answer}"
     
+    print(f"[Book2Dial] Completed dialog generation with {len(dialogs)} turns")
     return dialogs
 
-def append_to_jsonl(dialog, filename):
-    with open(filename, "a") as outfile:
-        outfile.write(json.dumps(dialog))
-        outfile.write("\n")
-
-def check_current_progress(filename):
-    """
-    Check the current progress by counting how many subsections have been completed.
-    Return the index of the next subsection to process.
-    """
-    try:
-        with open(filename, 'r') as f:
-            lines = f.readlines()
-            completed_sections = len(lines)
-        return completed_sections
-    except FileNotFoundError:
-        return 0
-
-def generate_and_save_dialogs(data, model_name, filename, turns=12):
-    # Check current progress
-    all_dialogs = []
-    start_section = check_current_progress(filename)
-    print('start_section',start_section)
-    for idx, section in enumerate(data["data"][start_section:], start=start_section):
-        print(f"Generating dialogs for subsection {idx + 1}/{len(data['data'])}")
-        dialogs = generate_dialog_for_section(section, model_name, turns)
-        dialog_data = {
-            "title": section["title"],
-            "context":section["paragraphs"][0]['context'],
-            "dialogs": dialogs
-            
-        }
-        append_to_jsonl(dialog_data, filename)
-        all_dialogs.append(dialog_data)
-
-    print(f"Generation finished, dialogs saved to {filename}")
-    return all_dialogs
-
 # Function to process JSON data directly without file reading
-def process_json_data(json_data, output_filename="test_science_low_info.jsonl", turns=12):
+def process_json_data(json_data, turns=12):
     """
-    Process JSON data directly without reading from a file.
+    Process JSON data directly to generate dialogs without saving to files.
     
     Args:
         json_data (dict): The JSON data to process
-        output_filename (str, optional): Filename to save dialogs. If None, returns the dialogs without saving.
         turns (int, optional): Number of dialog turns to generate. Defaults to 12.
         
     Returns:
-        If output_filename is provided, saves dialogs to file and returns None.
-        If output_filename is None, returns a list of dialog data.
+        dict: A dictionary containing all generated dialogs with metadata.
     """
-    # Make sure output_filename is an absolute path
-    if not os.path.isabs(output_filename):
-        # Save in the pdf2json/output directory
-        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
-        os.makedirs(output_dir, exist_ok=True)
-        output_filename = os.path.join(output_dir, output_filename)
-        
-    print(f"Will save dialogs to: {output_filename}")
+    print(f"[Book2Dial] Starting dialog generation from JSON data")
     
-    # Generate and save dialogs to file
-    all_dialogs = generate_and_save_dialogs(json_data, model_name, output_filename, turns)
-    return all_dialogs
+    all_dialogs = []
+    total_sections = len(json_data.get("data", []))
+    
+    for idx, section in enumerate(json_data.get("data", [])):
+        print(f"[Book2Dial] Processing section {idx + 1}/{total_sections}: {section.get('title', 'Unknown section')}")
+        
+        try:
+            dialogs = generate_dialog_for_section(section, model_name, turns)
+            dialog_data = {
+                "title": section["title"],
+                "context": section["paragraphs"][0]['context'] if section.get("paragraphs") else "",
+                "dialogs": dialogs
+            }
+            all_dialogs.append(dialog_data)
+        except Exception as e:
+            print(f"[Book2Dial] Error processing section {idx + 1}: {str(e)}")
+            # Continue with the next section rather than failing completely
+            continue
+
+    print(f"[Book2Dial] Dialog generation complete: {len(all_dialogs)} sections processed")
+    
+    # Return the results directly without saving to a file
+    result = {
+        "status": "complete",
+        "sections": all_dialogs,
+        "total_sections": total_sections,
+        "processed_sections": len(all_dialogs)
+    }
+    
+    return result

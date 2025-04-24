@@ -3,7 +3,7 @@ gpt.py
 
 This module provides the functionality to process a PDF file 
 and extract data from the images using OpenAI's multimodal model.
-It combines all extracted data into a single structured JSON file optimized
+It combines all extracted data into a structured JSON object optimized
 for children aged 6-8 who are learning a second language.
 """
 
@@ -21,10 +21,10 @@ from .util import get_image_files, process_text_to_structured_json
 
 
 def process(filename, folder, api_key, user_prompt: str = None,
-            model: str = "gpt-4.1", verbose: bool = False, cleanup: bool = False):
+            model: str = "gpt-4.1", verbose: bool = False, cleanup: bool = True):
     """
     Process the PDF file and extract data from the images using OpenAI's multimodal model.
-    Combines all outputs into a single structured JSON file optimized for children's language learning.
+    Combines all outputs into a single structured JSON object optimized for children's language learning.
 
     Args:
         filename (str): The name of the PDF file.
@@ -33,39 +33,29 @@ def process(filename, folder, api_key, user_prompt: str = None,
         user_prompt (str, optional): Custom prompt for the model. Defaults to None.
         model (str, optional): The OpenAI model to use. Defaults to "gpt-4.1".
         verbose (bool, optional): Whether to print verbose output. Defaults to False.
-        cleanup (bool, optional): Whether to clean up temporary files. Defaults to False.
+        cleanup (bool, optional): Whether to clean up temporary files. Defaults to True.
+        
+    Returns:
+        dict: The combined JSON data structure containing all extracted information.
     """
     os.chdir(folder)
     basename = os.path.basename(filename)
     file_title = os.path.splitext(basename)[0]  # Get filename without extension for title
 
+    # Create a temporary directory for image processing
     tmp_images_folder = f"./{basename}_tmp_images"
-    output_folder = f"./{basename}_output"
-    final_output_folder = f"{basename}_final_folders"
-    errors_folder = f"./{basename}_errors"
-    
-    # if the tmp_images_folder exists, delete it and create a new one
     shutil.rmtree(tmp_images_folder, ignore_errors=True)
     os.makedirs(tmp_images_folder, exist_ok=True)
     
-    # if the output_folder exists, delete it and create a new one
-    shutil.rmtree(output_folder, ignore_errors=True)
-    os.makedirs(output_folder, exist_ok=True)
-
-    # if the final_output_folder exists, delete it to make sure its empty
-    shutil.rmtree(final_output_folder, ignore_errors=True)
-    
-    # if the errors_folder exists, delete it and create a new one
-    shutil.rmtree(errors_folder, ignore_errors=True)
-    os.makedirs(errors_folder, exist_ok=True)
-
     if verbose:
-        print(f"Creating working folders")
+        print(f"[PDF Processing] Starting PDF to JSON conversion for '{basename}'")
     
     # Extract images from the PDF file and perform various operations on them
     # like resizing, splitting, and encoding
+    if verbose:
+        print(f"[PDF Processing] Extracting images from PDF file")
     image_encodings, image_files, filaname_image = do_images(
-        filename, tmp_images_folder, verbose=False)
+        filename, tmp_images_folder, verbose=verbose)
 
     # Set the OpenAI API key
     headers = {
@@ -146,7 +136,7 @@ def process(filename, folder, api_key, user_prompt: str = None,
     if user_prompt:
         prompt = user_prompt
         if verbose:
-            print(f"Using custom prompt: {prompt}\n")
+            print(f"[PDF Processing] Using custom prompt: {prompt}\n")
 
     # Initialize collection for all extracted JSON data
     all_extracted_data = []
@@ -156,15 +146,7 @@ def process(filename, folder, api_key, user_prompt: str = None,
         # First pass: Process each image to extract text content
         for index, image_encoding in enumerate(image_encodings):
             if verbose:
-                print(f"Processing image {index + 1} of {len(image_encodings)}  {image_files[index]}...")
-
-            # Check if JSON file for the image already exists in tmp folder
-            json_file_path = os.path.join(
-                errors_folder, f"{image_files[index]}.json")
-            if os.path.exists(json_file_path):
-                if verbose:
-                    print("JSON file already exists. Skipping...")
-                continue
+                print(f"[PDF Processing] Processing image {index + 1} of {len(image_encodings)} - sending request to OpenAI API")
 
             had_errors = False
             json_file_data = None
@@ -176,9 +158,12 @@ def process(filename, folder, api_key, user_prompt: str = None,
             # Check if the response contains an error
             if "error" in response_dict.keys():
                 if verbose:
-                    print("OpenAI returned error: ", response_dict["error"])
+                    print(f"[PDF Processing] OpenAI returned error: {response_dict['error']}")
                 had_errors = True
             else:
+                if verbose:
+                    print(f"[PDF Processing] Successfully received response from OpenAI API for image {index + 1}")
+                
                 # Extract the text content from the response
                 text_content = response_dict["choices"][0]["message"]["content"]
                 
@@ -188,77 +173,39 @@ def process(filename, folder, api_key, user_prompt: str = None,
                 # If it's not valid JSON, just store the text content
                 if json_file_data is None:
                     if verbose:
-                        print("Response is not valid JSON, storing as raw text")
+                        print(f"[PDF Processing] Response is not valid JSON, storing as raw text")
                     json_file_data = {"text": text_content, "page": index + 1}
                 
                 # Add to our collection
                 all_extracted_data.append(json_file_data)
                 all_text_content += f"\n\n--- PAGE {index + 1} ---\n\n{text_content}"
 
-            # Check if the response contains an error or if the JSON data is None
-            if had_errors:
-                # write the response to a JSON file in the temporary folder for debugging
-                json_file = os.path.join(
-                    errors_folder, f"{image_files[index]}.response.json")
-
-                with open(json_file, "w", encoding="utf-8") as file:
-                    json.dump(response_dict, file)
-
-                continue
-
-            # Write the response to a JSON file in the temporary folder
-            json_file = os.path.join(
-                output_folder, f"{image_files[index]}.json")
-            with open(json_file, "w", encoding="utf-8") as file:
-                json.dump(json_file_data, file)
-
-            # limit the number of requests to avoid rate limiting
-            sleep(5)
-        
-        # Second pass: Create the combined structured JSON
-        # Either by combining all the individual JSONs or by processing all text content
-        combined_json = create_combined_json(all_extracted_data, file_title, all_text_content, headers, model, verbose)
-        
-        # Write the combined JSON to a file
-        combined_json_file = os.path.join(
-            output_folder, f"{basename}_combined.json")
-            
-        with open(combined_json_file, "w", encoding="utf-8") as file:
-            json.dump(combined_json, file, indent=2)
-            
+        # Process all the extracted data to create a combined structured JSON
         if verbose:
-            print(f"Combined JSON file created: {combined_json_file}")
+            print(f"[PDF Processing] Creating combined structured JSON from {len(all_extracted_data)} processed images")
+            
+        combined_json = create_combined_json(
+            all_extracted_data, file_title, all_text_content, headers, model, verbose=verbose)
 
-        # Clean up the temporary images folder
+        # Clean up temporary files if cleanup is enabled
         if cleanup:
-            clean_up_tmp_images_folder(tmp_images_folder)
-
-        os.rename(output_folder, final_output_folder)
+            if verbose:
+                print(f"[PDF Processing] Cleaning up temporary files")
+            if os.path.exists(tmp_images_folder):
+                shutil.rmtree(tmp_images_folder)
+        
         if verbose:
-            print(f"Renaming output folder to {final_output_folder}")
-
-        # Print the final output folder
-        print("\n\n-------------------------------------------------------------")
-              
-        # Print the final output folder
-        if len(os.listdir(final_output_folder)) > 0:
-            print(f"JSON files saved in the folder '{final_output_folder}'")   
-            print(f"Combined structured JSON saved as '{basename}_combined.json'")
-        else:
-            # Remove the final output folder if it is empty
-            shutil.rmtree(final_output_folder, ignore_errors=True)
-
-        if len(os.listdir(errors_folder)) > 0:
-            print(f"Errors occurred during processing. Check the folder '{errors_folder}' for details.")
-        else:
-            # Remove the errors folder if it is empty
-            shutil.rmtree(errors_folder, ignore_errors=True)
-
+            print(f"[PDF Processing] PDF to JSON conversion complete")
+            
+        # Return the combined JSON data
         return combined_json
-
-    except Exception as error:
-        print(f"An error occurred: {error}")
-        raise Exception(f"PDF processing failed: {str(error)}")
+                
+    except Exception as e:
+        print(f"[PDF Processing] Error during PDF processing: {str(e)}")
+        # Clean up temporary files if cleanup is enabled
+        if cleanup and os.path.exists(tmp_images_folder):
+            shutil.rmtree(tmp_images_folder)
+        raise
 
 
 def create_combined_json(extracted_data, title, all_text_content, headers, model, verbose=False):
