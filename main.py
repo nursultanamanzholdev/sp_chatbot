@@ -389,4 +389,53 @@ async def read_notes(
     query = db.query(models.Note).filter(models.Note.parent_id == current_user.id)
     if child_name:
         query = query.filter(models.Note.child_name == child_name)
-    return query.offset(skip).limit(limit).all() 
+    return query.offset(skip).limit(limit).all()
+
+@app.get("/api/get-json-dialogs")
+async def get_json_dialogs(db: Session = Depends(get_db)):
+    """
+    Endpoint to fetch all prompts with their associated PDF book dialogs.
+    No authentication required. Intended for external data extraction.
+    
+    Returns:
+        JSON with all prompts and their associated PDF dialogs
+    """
+    # Query all prompts with their associated PDF books using a join
+    result = db.query(
+        models.Prompt.id.label("prompt_id"),
+        models.Prompt.name.label("prompt_name"),
+        models.Prompt.prompt.label("prompt_text"),
+        models.Prompt.mode.label("prompt_mode"),
+        models.PDFBook.id.label("pdf_id"),
+        models.PDFBook.book_reference.label("book_reference"),
+        models.PDFBook.json_content.label("json_content")
+    ).join(
+        models.PDFBook, 
+        models.Prompt.pdf_book_id == models.PDFBook.id, 
+        isouter=True
+    ).all()
+    
+    # Format the data for the response
+    formatted_data = []
+    for row in result:
+        item = {
+            "prompt": {
+                "id": row.prompt_id,
+                "name": row.prompt_name,
+                "text": row.prompt_text,
+                "mode": row.prompt_mode or "chat"  # Default to chat if mode is None
+            },
+            "pdf_book": None
+        }
+        
+        # Only include PDF book data if it exists
+        if row.pdf_id is not None:
+            item["pdf_book"] = {
+                "id": row.pdf_id,
+                "book_reference": row.book_reference,
+                "dialogs": row.json_content
+            }
+        
+        formatted_data.append(item)
+    
+    return {"dialogs": formatted_data} 
