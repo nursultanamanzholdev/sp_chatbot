@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 import re
 
-# Регулярное выражение для казахстанского номера телефона
 KZ_PHONE_REGEX = r'^\+7\s?\(?[0-9]{3}\)?\s?[0-9]{3}\s?[0-9]{2}\s?[0-9]{2}$'
 
 def validate_kz_phone(phone: str) -> bool:
@@ -110,4 +109,4 @@ class History(HistoryBase):
     created_at: datetime
 
     class Config:
-        from_attributes = True 
+        from_attributes = True

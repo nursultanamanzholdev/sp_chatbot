@@ -1,12 +1,3 @@
-"""
-gpt.py
-
-This module provides the functionality to process a PDF file 
-and extract data from the images using OpenAI's multimodal model.
-It combines all extracted data into a structured JSON object optimized
-for children aged 6-8 who are learning a second language.
-"""
-
 import os
 import sys
 import json
@@ -40,9 +31,8 @@ def process(filename, folder, api_key, user_prompt: str = None,
     """
     os.chdir(folder)
     basename = os.path.basename(filename)
-    file_title = os.path.splitext(basename)[0]  # Get filename without extension for title
+    file_title = os.path.splitext(basename)[0] 
 
-    # Create a temporary directory for image processing
     tmp_images_folder = f"./{basename}_tmp_images"
     shutil.rmtree(tmp_images_folder, ignore_errors=True)
     os.makedirs(tmp_images_folder, exist_ok=True)
@@ -50,20 +40,16 @@ def process(filename, folder, api_key, user_prompt: str = None,
     if verbose:
         print(f"[PDF Processing] Starting PDF to JSON conversion for '{basename}'")
     
-    # Extract images from the PDF file and perform various operations on them
-    # like resizing, splitting, and encoding
     if verbose:
         print(f"[PDF Processing] Extracting images from PDF file")
     image_encodings, image_files, filaname_image = do_images(
         filename, tmp_images_folder, verbose=verbose)
 
-    # Set the OpenAI API key
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {api_key}',
     }
 
-    # Define the default prompt for extracting text
     default_prompt = """
     You are an expert educator specializing in children's second language acquisition.
     Extract all visible text content from this image, focusing on content that would be 
@@ -71,7 +57,6 @@ def process(filename, folder, api_key, user_prompt: str = None,
     Preserve paragraph structure and format your response as plain text.
     """
 
-    # Define structured extraction prompt for children's language learning if not provided by user
     structured_prompt = """
     You are an expert in childhood education with specialization in second language acquisition for young children ages 6-8.
     
@@ -131,19 +116,16 @@ def process(filename, folder, api_key, user_prompt: str = None,
     6. EVERY category must be filled with appropriate content
     """
 
-    # Use the user-provided prompt if available, otherwise use the structured prompt
     prompt = structured_prompt
     if user_prompt:
         prompt = user_prompt
         if verbose:
             print(f"[PDF Processing] Using custom prompt: {prompt}\n")
 
-    # Initialize collection for all extracted JSON data
     all_extracted_data = []
     all_text_content = ""
 
     try:
-        # First pass: Process each image to extract text content
         for index, image_encoding in enumerate(image_encodings):
             if verbose:
                 print(f"[PDF Processing] Processing image {index + 1} of {len(image_encodings)} - sending request to OpenAI API")
@@ -151,11 +133,9 @@ def process(filename, folder, api_key, user_prompt: str = None,
             had_errors = False
             json_file_data = None
 
-            # Process the image using the specified OpenAI model
             response_dict = process_image_to_json(
                 image_encoding, prompt, headers, model)
 
-            # Check if the response contains an error
             if "error" in response_dict.keys():
                 if verbose:
                     print(f"[PDF Processing] OpenAI returned error: {response_dict['error']}")
@@ -164,30 +144,24 @@ def process(filename, folder, api_key, user_prompt: str = None,
                 if verbose:
                     print(f"[PDF Processing] Successfully received response from OpenAI API for image {index + 1}")
                 
-                # Extract the text content from the response
                 text_content = response_dict["choices"][0]["message"]["content"]
                 
-                # Try to parse as JSON
                 json_file_data = parse_json_string(text_content)
 
-                # If it's not valid JSON, just store the text content
                 if json_file_data is None:
                     if verbose:
                         print(f"[PDF Processing] Response is not valid JSON, storing as raw text")
                     json_file_data = {"text": text_content, "page": index + 1}
                 
-                # Add to our collection
                 all_extracted_data.append(json_file_data)
                 all_text_content += f"\n\n--- PAGE {index + 1} ---\n\n{text_content}"
 
-        # Process all the extracted data to create a combined structured JSON
         if verbose:
             print(f"[PDF Processing] Creating combined structured JSON from {len(all_extracted_data)} processed images")
             
         combined_json = create_combined_json(
             all_extracted_data, file_title, all_text_content, headers, model, verbose=verbose)
 
-        # Clean up temporary files if cleanup is enabled
         if cleanup:
             if verbose:
                 print(f"[PDF Processing] Cleaning up temporary files")
@@ -197,12 +171,10 @@ def process(filename, folder, api_key, user_prompt: str = None,
         if verbose:
             print(f"[PDF Processing] PDF to JSON conversion complete")
             
-        # Return the combined JSON data
         return combined_json
                 
     except Exception as e:
         print(f"[PDF Processing] Error during PDF processing: {str(e)}")
-        # Clean up temporary files if cleanup is enabled
         if cleanup and os.path.exists(tmp_images_folder):
             shutil.rmtree(tmp_images_folder)
         raise
@@ -223,7 +195,6 @@ def create_combined_json(extracted_data, title, all_text_content, headers, model
     Returns:
         dict: Combined structured JSON
     """
-    # Initialize the structure for our combined JSON with children's language learning format
     combined_json = {
         "data": [
             {
@@ -239,10 +210,8 @@ def create_combined_json(extracted_data, title, all_text_content, headers, model
         ]
     }
     
-    # Method 1: Try to combine individual page JSON data if they're already structured
     structured_count = 0
     
-    # Process only pages and content if it contains valid data (not empty)
     for page_index, item in enumerate(extracted_data):
         # Check if this is empty content
         if isinstance(item, dict) and "context" in item and (not item["context"] or (isinstance(item["context"], list) and len(item["context"]) == 0)):

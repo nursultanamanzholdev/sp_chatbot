@@ -16,14 +16,12 @@ from pdf2json.book2dial import process_json_data
 from dotenv import load_dotenv
 import time
 
-# Load environment variables from .env file
 load_dotenv()
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# CORS Setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://chatbot-frontend-oeip.onrender.com", "http://localhost:3000"],
@@ -78,7 +76,7 @@ async def update_user_profile(
         current_user.name = user_update.name
     if user_update.email:
         current_user.email = user_update.email
-    if user_update.phone is not None:  # Проверяем на None, так как пустая строка - это валидное значение
+    if user_update.phone is not None:
         current_user.phone = user_update.phone
     db.commit()
     db.refresh(current_user)
@@ -116,25 +114,21 @@ async def upload_pdf_book(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Create a temporary directory for PDF processing if it doesn't exist
     temp_dir = os.path.join(os.getcwd(), "temp_uploads")
     os.makedirs(temp_dir, exist_ok=True)
     
-    # Generate a unique filename to avoid collisions
     timestamp = int(time.time())
     unique_filename = f"{timestamp}_{file.filename}"
     file_path = os.path.join(temp_dir, unique_filename)
     
     print(f"[Upload] Received PDF upload: {file.filename}, saving as: {unique_filename}")
     
-    # Save the file content to disk temporarily
     file_content = await file.read()
     with open(file_path, "wb") as f:
         f.write(file_content)
     
     print(f"[Upload] PDF file saved to: {file_path}")
     
-    # Create a new PDFBook record in the database with initial status
     db_pdf = models.PDFBook(
         filename=file.filename,
         book_reference=book_reference,
@@ -148,7 +142,6 @@ async def upload_pdf_book(
     
     print(f"[Upload] Created new PDF book record with ID: {db_pdf.id}")
     
-    # If prompt_id is provided, update the prompt with the pdf_book_id
     if prompt_id:
         prompt = db.query(models.Prompt).filter(
             models.Prompt.id == prompt_id,
@@ -159,7 +152,6 @@ async def upload_pdf_book(
             db.commit()
             print(f"[Upload] Associated PDF with prompt ID: {prompt_id}")
     
-    # Process the PDF in the background
     background_tasks.add_task(
         process_pdf_to_json,
         file_path=file_path,
@@ -182,35 +174,29 @@ async def get_pdf_books(
     ).all()
 
 async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: Session):
-    """Process PDF to JSON in the background and update the database when complete"""
     try:
-        # Get the filename and directory
         filename = os.path.basename(file_path)
         folder = os.path.dirname(file_path)
         
         print(f"[PDF2JSON] Starting processing for PDF: {filename} (ID: {db_pdf_id})")
         
-        # Get OpenAI API key from environment variable
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise Exception("OpenAI API key not found in environment variables")
         
         print(f"[PDF2JSON] Converting PDF to structured JSON")
-        # Process the PDF to JSON
         combined_json = pdf_to_json_process(
             filename=filename,
             folder=folder,
             api_key=api_key,
             verbose=True,
-            cleanup=True  # Clean up temporary files
+            cleanup=True
         )
         
         print(f"[PDF2JSON] Generating dialogs from structured JSON")
-        # Generate dialogs from the JSON data - no file saving
         dialogs = process_json_data(combined_json)
         
         print(f"[PDF2JSON] Dialog generation complete, saving to database")
-        # Update the database with the JSON content and set status to complete
         db_pdf = db.query(models.PDFBook).filter(
             models.PDFBook.id == db_pdf_id,
             models.PDFBook.user_id == user_id
@@ -221,7 +207,6 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
             db.commit()
             print(f"[PDF2JSON] Successfully updated database with dialogs for PDF ID {db_pdf_id}")
             
-            # Delete the temporary PDF file
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -231,7 +216,6 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
             
     except Exception as e:
         print(f"[PDF2JSON] Error processing PDF: {str(e)}")
-        # Update the database with the error
         db_pdf = db.query(models.PDFBook).filter(
             models.PDFBook.id == db_pdf_id,
             models.PDFBook.user_id == user_id
@@ -242,7 +226,6 @@ async def process_pdf_to_json(file_path: str, db_pdf_id: int, user_id: int, db: 
             db.commit()
             print(f"[PDF2JSON] Updated database with error status for PDF ID {db_pdf_id}")
         
-        # Delete the temporary PDF file
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -256,7 +239,6 @@ async def get_pdf_book_status(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Find the PDF book
     db_pdf = db.query(models.PDFBook).filter(
         models.PDFBook.id == pdf_id,
         models.PDFBook.user_id == current_user.id
@@ -265,14 +247,12 @@ async def get_pdf_book_status(
     if not db_pdf:
         raise HTTPException(status_code=404, detail="PDF book not found")
     
-    # Check the status in the json_content field
     if not db_pdf.json_content:
         return {"status": "unknown"}
     
     if isinstance(db_pdf.json_content, dict) and "status" in db_pdf.json_content:
         return {"status": db_pdf.json_content["status"], "message": db_pdf.json_content.get("message", "")}
     
-    # If json_content exists and doesn't have a status field, it means processing is complete
     return {"status": "complete"}
 
 @app.delete("/api/pdf-books/{pdf_id}")
@@ -281,7 +261,6 @@ async def delete_pdf_book(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Find the PDF book
     db_pdf = db.query(models.PDFBook).filter(
         models.PDFBook.id == pdf_id,
         models.PDFBook.user_id == current_user.id
@@ -290,12 +269,10 @@ async def delete_pdf_book(
     if not db_pdf:
         raise HTTPException(status_code=404, detail="PDF book not found")
 
-    # Remove pdf_book_id reference from any prompts
     prompts = db.query(models.Prompt).filter(models.Prompt.pdf_book_id == pdf_id).all()
     for prompt in prompts:
         prompt.pdf_book_id = None
 
-    # Delete the PDF book
     db.delete(db_pdf)
     db.commit()
 
@@ -393,14 +370,6 @@ async def read_notes(
 
 @app.get("/api/get-json-dialogs")
 async def get_json_dialogs(db: Session = Depends(get_db)):
-    """
-    Endpoint to fetch all prompts with their associated PDF book dialogs.
-    No authentication required. Intended for external data extraction.
-    
-    Returns:
-        JSON with all prompts and their associated PDF dialogs
-    """
-    # Query all prompts with their associated PDF books using a join
     result = db.query(
         models.Prompt.id.label("prompt_id"),
         models.Prompt.name.label("prompt_name"),
@@ -415,7 +384,6 @@ async def get_json_dialogs(db: Session = Depends(get_db)):
         isouter=True
     ).all()
     
-    # Format the data for the response
     formatted_data = []
     for row in result:
         item = {
@@ -423,12 +391,11 @@ async def get_json_dialogs(db: Session = Depends(get_db)):
                 "id": row.prompt_id,
                 "name": row.prompt_name,
                 "text": row.prompt_text,
-                "mode": row.prompt_mode or "chat"  # Default to chat if mode is None
+                "mode": row.prompt_mode or "chat"
             },
             "pdf_book": None
         }
         
-        # Only include PDF book data if it exists
         if row.pdf_id is not None:
             item["pdf_book"] = {
                 "id": row.pdf_id,

@@ -1,17 +1,15 @@
-# final version
-
 import os
 import json
 import time
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Load environment variables from .env.local
 load_dotenv('.env')
 
 client = OpenAI(
     api_key=os.environ.get('OPENAI_API_KEY'),
 )
+
 
 def generate_prompt1(chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation):
     prompt = ( "Task: You are a student preparing to ask questions about a textbook subsection to a teacher. "
@@ -28,6 +26,8 @@ def generate_prompt1(chapter_title, section_title, chapter_summary, bold_terms, 
     "Expected Output: Please phrase your question as a string.")
     
     return prompt
+
+
 def generate_prompt2(chapter_title, section_title,context, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation,question):
     prompt = ("Task: You are a teacher preparing to answer a student's question about a subsection of a textbook. "
     f"The student's question is: {question}. Provide a concise, specific response, ensuring it's not a summary and "
@@ -49,6 +49,7 @@ def generate_prompt2(chapter_title, section_title,context, chapter_summary, bold
     
     return prompt
 
+
 def generate_response0(prompt, model):
     while True:
         try:
@@ -63,12 +64,14 @@ def generate_response0(prompt, model):
             print(f"[Book2Dial] Error occurred while generating response: {str(e)}. Retrying in 2 seconds...")
             time.sleep(2)
 
+
 def generate_question(chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation, model):
     prompt = generate_prompt1(chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation)
     completion = generate_response0(prompt, model)
     question = completion.choices[0].message.content
     # escaped_content = question.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\t', '\\t')
     return question
+
 def generate_answer(question, context, chapter_title, section_title, chapter_summary, bold_terms, learning_objectives, concepts, introduction, previous_conversation, model):
     if not question:
         print('[Book2Dial] Empty question was given as input.')
@@ -79,13 +82,11 @@ def generate_answer(question, context, chapter_title, section_title, chapter_sum
     # escaped_content = answer_data.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\t', '\\t')
     return answer
 
-# Can use different models to do this task, for example: gpt-4o
+
 model_name = "gpt-4o-mini"
 
 def make_json_friendly(s):
-    # Escape backslashes
     s = s.replace("\\", "\\\\")
-    # Escape double quotes
     s = s.replace('"', '\\"')
     return s
 
@@ -95,16 +96,13 @@ def generate_dialog_for_section(section, model_name, turns=12):
     paragraphs = section.get("paragraphs", [])
     context = paragraphs[0]["context"] if paragraphs else ""
     
-    # Safely access 'bold_terms' and handle case where it's missing
     bold_terms = ', '.join(term.strip() for term in section.get('bold_terms', []))
     
     section_title = section.get("section_title", "")
     chapter_summary = section.get('chapter_summary', "")
     
-    # Safely access other potentially missing keys
     learning_objectives = ', '.join(objective.strip() for objective in section.get('chapter_learning_objectives', []))
     
-    # Handle potential missing 'chapter_concept' key
     if 'chapter_concept' in section and section['chapter_concept']:
         concepts = ', '.join(concept['name'].strip() for concept in section['chapter_concept'])
     else:
@@ -112,7 +110,6 @@ def generate_dialog_for_section(section, model_name, turns=12):
     
     introduction = section.get('chapter_introduction', "")
     previous_conversation = ""
-    
     
     dialogs = []
     for i in range(turns // 2):
@@ -133,18 +130,8 @@ def generate_dialog_for_section(section, model_name, turns=12):
     print(f"[Book2Dial] Completed dialog generation with {len(dialogs)} turns")
     return dialogs
 
-# Function to process JSON data directly without file reading
+
 def process_json_data(json_data, turns=12):
-    """
-    Process JSON data directly to generate dialogs without saving to files.
-    
-    Args:
-        json_data (dict): The JSON data to process
-        turns (int, optional): Number of dialog turns to generate. Defaults to 12.
-        
-    Returns:
-        dict: A dictionary containing all generated dialogs with metadata.
-    """
     print(f"[Book2Dial] Starting dialog generation from JSON data")
     
     all_dialogs = []
@@ -163,12 +150,10 @@ def process_json_data(json_data, turns=12):
             all_dialogs.append(dialog_data)
         except Exception as e:
             print(f"[Book2Dial] Error processing section {idx + 1}: {str(e)}")
-            # Continue with the next section rather than failing completely
             continue
 
     print(f"[Book2Dial] Dialog generation complete: {len(all_dialogs)} sections processed")
     
-    # Return the results directly without saving to a file
     result = {
         "status": "complete",
         "sections": all_dialogs,

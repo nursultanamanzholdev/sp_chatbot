@@ -11,7 +11,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     name = Column(String)
-    phone = Column(String)  # Добавляем поле для телефона
+    phone = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     notes = relationship("Note", back_populates="parent")
@@ -52,7 +52,7 @@ class PDFBook(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String)
     book_reference = Column(String)
-    json_content = Column(JSON)  # Changed from file_content to json_content
+    json_content = Column(JSON)
     user_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

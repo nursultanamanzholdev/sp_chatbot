@@ -9,7 +9,7 @@ import models
 import schemas
 from database import get_db
 
-SECRET_KEY = "your-secret-key-here"  # replace with your own secret key
+SECRET_KEY = "your-secret-key-here"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

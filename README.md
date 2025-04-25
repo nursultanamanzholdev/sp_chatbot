@@ -1,89 +1,40 @@
-# Project Setup Guide
+# SLA Chatbot
 
-This README provides complete instructions for setting up and launching the project, including both backend and frontend components.
+Second Language Acquisition (SLA) chatbot platform designed to help children learn through interactive conversations.
 
-## Prerequisites
+## Features
 
-- Node.js v20.11.1
-- Python 3.10+
+- **User Authentication**: Secure login and registration system
+- **PDF Processing**: Upload PDF books that are automatically converted into interactive dialog format
+- **Custom Prompts**: Create and manage custom conversation prompts
+- **Educational Mode**: Interactive learning sessions based on textbook content
+- **Language Learning**: English language tutoring with adaptive feedback
+- **Conversation History**: Track and review past conversations
+- **Notes System**: Save and organize notes with feedback
 
-## Project Setup
+## Technical Stack
 
-### Backend Setup
+### Backend
+- FastAPI framework with SQLAlchemy ORM
+- PostgreSQL database
+- PDF processing pipeline
 
-1. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   ```
+### Frontend
+- Next.js React framework
+- Tailwind CSS for styling
+- Responsive design for all devices
 
-2. Activate the virtual environment:
-   
-   **Windows:**
-   ```bash
-   .\venv\Scripts\activate
-   ```
-   
-   **macOS/Linux:**
-   ```bash
-   source venv/bin/activate
-   ```
+## Raspberry Pi script
 
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+The repository includes `chatbot_raspberry.py` that provides functionality for running the chatbot on a Raspberry PI 5 device. This script includes:
 
-4. Run database migrations:
-   ```bash
-   python migrations.py
-   ```
+- TTS and ASR capabilites
+- Language model that generates text based on json dialogs
+- Support for chat and lecture learning modes
+- Audio recording and text-to-speech conversion
 
-### Frontend Setup
+## Modes of Operation
 
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
+1. **Chat Mode**: General purpose conversations
+2. **Lecture Mode**: Helps children understand concepts from textbooks
 
-2. Install frontend dependencies:
-   ```bash
-   npm install --legacy-peer-deps
-   ```
-
-## Running the Project
-
-### Start the Backend
-
-1. With the virtual environment activated, run:
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-   ```
-   This will start the backend server on http://localhost:8000
-
-### Start the Frontend
-
-1. Open a new terminal window
-2. Activate the virtual environment (if not already activated)
-3. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-4. Run the development server:
-   ```bash
-   npm run dev
-   ```
-   This will start the frontend development server
-
-## Accessing the Application
-
-After starting both the backend and frontend servers, you can access the application by opening your browser and navigating to the URL displayed in the frontend terminal (typically http://localhost:3000 or http://localhost:5173).
-
-## Stopping the Servers
-
-To stop either server, press `Ctrl+C` in the respective terminal window.
-
-## Troubleshooting
-
-- If you encounter dependency issues with the frontend, try running `npm install --force` instead of `npm install --legacy-peer-deps`
-- Ensure that both backend and frontend servers are running simultaneously
-- Check console output for any error messages
